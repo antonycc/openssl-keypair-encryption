@@ -13,93 +13,116 @@
 # Constants
 PEM_DIR=~/.ssh
 PEM_EXT='*.pem'
-RECIPIENTS_LOCAL_DIR='recipients'
+RECIPIENTS_DIR='recipients'
 SECRETS_FILE='secret-files.txt'
-CLEAR_ARCHIVE_FILE='clear-archive.tmp'
+ARCHIVE_FILE='archive.tar'
 
 # Parameters
 COMMAND="${1:list}"
 PUBLIC_PRIVATE_PAIR_PEM="${2}"
 
-if [[ "${COMMAND?}" == "nop" ]] ;
+if [[ "${COMMAND?}" == 'generate' ]] ;
 then
 
-  echo 'NOP'
+  echo 'TODO: Generate a compatible keypair'
 
 elif [[ "${COMMAND?}" == 'list' ]] ;
 then
 
   # List files in the local key store
-  find "${PEM_DIR?}" -name "${PEM_EXT?}"
+  echo "keypairs in ${PEM_DIR?}:"
+  find "${PEM_DIR?}" -name "${PEM_EXT?}" -exec basename "{}" \;
 
 elif [[ "${COMMAND?}" == 'add' ]] ;
 then
 
   # Extract a public key from the key store and add this to the recipients list
-  mkdir -p "${RECIPIENTS_LOCAL_DIR?}"
-  openssl rsa i\
-    -in "${PUBLIC_PRIVATE_PAIR_PEM?}" \
+  mkdir -p "${RECIPIENTS_DIR?}"
+  openssl rsa \
+    -in "${PEM_DIR?}/${PUBLIC_PRIVATE_PAIR_PEM?}" \
     -pubout \
-    > "${RECIPIENTS_LOCAL_DIR?}/${PUBLIC_PRIVATE_PAIR_PEM?}.public"
+    > "${RECIPIENTS_DIR?}/${PUBLIC_PRIVATE_PAIR_PEM?}.public" ;
 
 elif [[ "${COMMAND?}" == 'remove' ]] ;
 then
 
   # Remove a public key from the recipients list
-  rm -f "${RECIPIENTS_LOCAL_DIR?}/${PUBLIC_PRIVATE_PAIR_PEM?}.public"
+  rm -f "${RECIPIENTS_DIR?}/${PUBLIC_PRIVATE_PAIR_PEM?}.public" ;
 
 elif [[ "${COMMAND?}" == 'encrypt' ]] ;
 then
 
   # Build an archive containing all the secret files
+  rm -f "${ARCHIVE_FILE?}"
   cat "${SECRETS_FILE?}" \
-    | while read SECRET_FILE \
-      ; do \
-        ; tar -r --file "${CLEAR_ARCHIVE_FILE?}" --verbose "${SECRET_FILE?}" \
-      ; done
+    | while read SECRET_FILE ;
+      do 
+        tar -r \
+          --file "${ARCHIVE_FILE?}" 
+          --verbose \
+          "${SECRET_FILE?}" ;
+      done
 
   # Encrypt the secret archive for each registered recipient
-  For each recipient
-    openssl rsautl \
-      -encrypt \
-      -inkey "${PUBLIC_PRIVATE_PAIR_PEM?}.public" \
-      -pubin \
-      -in "${CLEAR_ARCHIVE_FILE?}" i
-      -out "${ENCRYPTED_ARCHIVE_FILE?}.${PUBLIC_PRIVATE_PAIR_PEM?}.enc"
-    tar -r --file "${ENCRYPTED_ARCHIVE_FILE?}" --verbose "${ENCRYPTED_ARCHIVE_FILE?}.${PUBLIC_PRIVATE_PAIR_PEM?}.enc" \
+  rm -f "${ARCHIVE_FILE?}.enc"
+  find "${RECIPIENTS_DIR?}" \
+    -name "*.public" \
+    | while read PUBLIC_KEY_FILE ;
+    do
+      echo "Encrypting ${ARCHIVE_FILE?} with public key ${PUBLIC_KEY_FILE?}"
+      rm -f "${ARCHIVE_FILE?}.${PUBLIC_KEY_FILE?}.enc"
+      openssl rsautl \
+        -encrypt \
+        -inkey "${PUBLIC_KEY_FILE?}" \
+        -pubin \
+        -in "${ARCHIVE_FILE?}" \
+        -out "${ARCHIVE_FILE?}.${PUBLIC_KEY_FILE?}.enc" ;
+      tar -r \
+        --file "${ARCHIVE_FILE?}.enc" \
+        --verbose \
+        "${ARCHIVE_FILE?}.${PUBLIC_KEY_FILE?}.enc" ;
+      rm "${ARCHIVE_FILE?}.${PUBLIC_KEY_FILE?}.enc"
+    done
 
 elif [[ "${COMMAND?}" == 'decrypt' ]] ;
 then
   
   # Extract the secret archive
-  tar -x --file "${CLEAR_ARCHIVE_FILE?}.enc.tar"
+  #tar -x --file "${ARCHIVE_FILE?}.enc"
 
-  # If there is named keypair select the first one that matches a local kaypair 
-  if [[ "${PUBLIC_PRIVATE_PAIR_PEM}" == "" ]] ;
-  then
-    PUBLIC_PRIVATE_PAIR_PEM='antony-pikselmbp-projects.pem'
-  fi
-
-  # Decrypt the files using a local keypair
-  openssl rsautl \
-    -decrypt \
-    -inkey "${PUBLIC_PRIVATE_PAIR_PEM?}" \
-    -in "${CLEAR_FILE?}.${PUBLIC_PRIVATE_PAIR_PEM?}.enc" 
-    -out "${CLEAR_FILE?}"
-  rm -f "${CLEAR_FILE?}.${PUBLIC_PRIVATE_PAIR_PEM?}.enc"
-  tar -x --file "${CLEAR_ARCHIVE_FILE?}"
-  rm -f "${CLEAR_ARCHIVE_FILE?}"
+  # Extract for the recipients for which a keypair exists locally
+  tar -t --file "${ARCHIVE_FILE?}.enc" \
+    | while read RECIPIENT_ARCHIVE_FILE ;
+    do
+      PUBLIC_PRIVATE_PAIR_PEM="${PEM_DIR?}-some-transformation-of-${RECIPIENT_ARCHIVE_FILE?}"
+      if [[ -e "${PUBLIC_PRIVATE_PAIR_PEM?}" ]] ;
+      then
+        echo "Decrypting using ${PUBLIC_PRIVATE_PAIR_PEM?}"
+        # TODO: Extract the recipient archive file
+        openssl rsautl \
+	  -decrypt \
+	  -inkey "${PUBLIC_PRIVATE_PAIR_PEM?}" \
+	  -in "${RECIPIENT_ARCHIVE_FILE?}" 
+	  -out "${ARCHIVE_FILE?}" ;
+        rm -f "${RECIPIENT_ARCHIVE_FILE?}"
+        tar -x \
+          --verbose \
+          --file "${ARCHIVE_FILE?}" ;
+        rm -f "${ARCHIVE_FILE?}"
+      else
+        echo "Skipping ${PUBLIC_PRIVATE_PAIR_PEM?} (no local key pair)"
+      fi
+    done
 
 else
 
   echo 'Usage:'
+  echo '  ./open-ssl-pk-enc.sh generate'
   echo '  ./open-ssl-pk-enc.sh list'
   echo '  ./open-ssl-pk-enc.sh add <.pem filename>'
   echo '  ./open-ssl-pk-enc.sh remove <.pem filename>'
   echo '  ./open-ssl-pk-enc.sh encrypt'
-  echo '  ./open-ssl-pk-enc.sh encrypt <.pem filename>'
   echo '  ./open-ssl-pk-enc.sh decrypt'
-  echo '  ./open-ssl-pk-enc.sh decrypt <.pem filename>'
 
 fi
 
