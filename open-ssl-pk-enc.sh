@@ -9,9 +9,24 @@
 #   https://linux.die.net/man/1/rsautl
 #   https://www.openssl.org/docs/man1.0.2/man1/openssl-enc.html
 #   https://www.czeskis.com/random/openssl-encrypt-file.html
+# TODO:
+#   Generate a compatible keypair
+#   Annotate keys which are installed as recipients
+#   List keys which are installed as recipients annotating those which have a local private key
+#   Decrypt files and consult in the current shell
+#   Allow parameter override of KEY_DIR
+#   Document usage in README
+#   Document manual equivelant in README
+#   Docker execution
+#   Capture Macos (Brew) and Debian package manager dependencies
+#   Test package dependencies
+#   Test suite
+#   Standard approach for parameter handling
+#   Key structure diagram
+#   Internally call list operations after an update
 
 # Constants
-PEM_DIR=~/.ssh
+KEY_DIR=~/.ssh
 CIPHERNAME='aes-256-cbc'
 RECIPIENTS_DIR='recipients'
 SECRETS_FILE='secret-files.txt'
@@ -25,38 +40,84 @@ ENC_DEBUG='-v'
 COMMAND="${1:list}"
 PUBLIC_PRIVATE_PAIR="${2}"
 
-if [[ "${COMMAND?}" == 'generate' ]] ;
+
+if [[ "${COMMAND?}" == 'generate-keypair' ]] ;
 then
 
   echo 'TODO: Generate a compatible keypair' ;
 
-elif [[ "${COMMAND?}" == 'list' ]] ;
+elif [[ "${COMMAND?}" == 'list-available-keypairs' ]] ;
 then
 
   # List PEM files in the local key store
-  find "${PEM_DIR?}" \
+  find "${KEY_DIR?}" \
     -name "*.pem" \
     | while read -r PUBLIC_PRIVATE_PAIR_PEM_FILE ;
     do
-      echo -n "[${PEM_DIR?}/] " \
+      echo -n "[${KEY_DIR?}/] " \
       && basename "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" \
-        | sed -e 's/.pem$//' ;
+        | sed -e 's/.pem$/ (.pem format)/' ;
     done ;
 
-elif [[ "${COMMAND?}" == 'add' ]] ;
+  # List RSA files in the local key store
+  find "${KEY_DIR?}" \
+    -name "*.pub" \
+    | while read -r PUBLIC_PRIVATE_PAIR_PEM_FILE ;
+    do
+      echo -n "[${KEY_DIR?}/] " \
+      && basename "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" \
+        | sed -e 's/.pub$/ (RSA format)/' ;
+    done ;
+
+  echo 'TODO: Annotate keys which are installed as recipients' ;
+
+elif [[ "${COMMAND?}" == 'list-recipients' ]] ;
 then
 
-  # Extract a public key from the key store and add this to the recipients list
-  mkdir -p "${RECIPIENTS_DIR?}" \
-  && RECIPIENT=$(basename "${PUBLIC_PRIVATE_PAIR?}" | sed -e 's/.pem$//') \
-  && openssl rsa \
-    -in "${PEM_DIR?}/${PUBLIC_PRIVATE_PAIR?}.pem" \
-    -pubout \
-    > "${RECIPIENTS_DIR?}/${PUBLIC_PRIVATE_PAIR?}.public" \
-  ; ls -l "${RECIPIENTS_DIR?}" \
-    | grep -v '^total' ;
+  # List public key files in the local key store
+  find "${RECIPIENTS_DIR?}" \
+    -name "*.public" \
+    | while read -r PUBLIC_KEY_FILE ;
+    do
+      echo -n "[${RECIPIENTS_DIR?}/] " \
+      && basename "${PUBLIC_KEY_FILE?}" ;
+    done ;
 
-elif [[ "${COMMAND?}" == 'remove' ]] ;
+  echo 'TODO: Annotate recipients have a private key available' ;
+
+elif [[ "${COMMAND?}" == 'add-recipient' ]] ;
+then
+
+  # Resolve file names
+  RECIPIENT=$(basename "${PUBLIC_PRIVATE_PAIR?}" | sed -e 's/.pem$//') ;
+  PUBLIC_PRIVATE_PAIR_RSA_FILE="${KEY_DIR?}/${RECIPIENT?}.pem" ;
+  PUBLIC_PRIVATE_PAIR_PEM_FILE="${KEY_DIR?}/${RECIPIENT?}.pem" ;
+
+  # Generate a PEM if we need to and add to the local key store
+  if [[ ! -e "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" && -e "${PUBLIC_PRIVATE_PAIR_RSA_FILE?}" ]] ;
+  then
+     echo "Found RSA \"PUBLIC_PRIVATE_PAIR_RSA_FILE\" generating a PEM and adding to \"${KEY_DIR?}\"" \
+     && openssl rsa \
+       -in "${PUBLIC_PRIVATE_PAIR_RSA_FILE?}" \
+       -outform pem \
+       > "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" \
+     && chmod 600 "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" ;
+  fi ;
+
+  # Extract a public key from the key store and add this to the recipients list
+  if [[ -e "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" ]] ;
+  then
+     echo "Found .pem \"PUBLIC_PRIVATE_PAIR_PEM_FILE\" extracting the public key and adding to \"${RECIPIENTS_DIR?}\"" \
+     && mkdir -p "${RECIPIENTS_DIR?}" \
+     && openssl rsa \
+       -in "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" \
+       -pubout \
+       > "${RECIPIENTS_DIR?}/${PUBLIC_PRIVATE_PAIR?}.public" \
+     ; ls -l "${RECIPIENTS_DIR?}" \
+       | grep -v '^total' ;
+  fi ;
+
+elif [[ "${COMMAND?}" == 'remove-recipient' ]] ;
 then
 
   # Remove a public key from the recipients list
@@ -124,7 +185,7 @@ then
     do
       RECIPIENT=$(basename "${RECIPIENT_KEY_ENCRYPTED?}" | sed -e 's/.key.bin.enc$//') \
       && RECIPIENT_ARCHIVE_FILE="${RECIPIENT?}.${ARCHIVE_FILE?}.tar.enc" \
-      && PUBLIC_PRIVATE_PAIR_PEM_FILE="${PEM_DIR?}/${RECIPIENT?}.pem" \
+      && PUBLIC_PRIVATE_PAIR_PEM_FILE="${KEY_DIR?}/${RECIPIENT?}.pem" \
       && if [[ -e "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" ]] ;
       then
         echo "Decrypting \"${RECIPIENT_ARCHIVE_FILE?}\" with public key \"${PUBLIC_PRIVATE_PAIR_PEM_FILE?}\"" ;
@@ -161,10 +222,11 @@ then
 else
 
   echo 'Usage:' ;
-  echo '  ./open-ssl-pk-enc.sh generate' ;
-  echo '  ./open-ssl-pk-enc.sh list' ;
-  echo '  ./open-ssl-pk-enc.sh add <.pem filename>' ;
-  echo '  ./open-ssl-pk-enc.sh remove <.pem filename>' ;
+  echo '  ./open-ssl-pk-enc.sh generate-keypair' ;
+  echo '  ./open-ssl-pk-enc.sh list-available-keypairs' ;
+  echo '  ./open-ssl-pk-enc.sh list-recipients' ;
+  echo '  ./open-ssl-pk-enc.sh add-recipient <.pem filename>' ;
+  echo '  ./open-ssl-pk-enc.sh remove-recipient <.pem filename>' ;
   echo '  ./open-ssl-pk-enc.sh encrypt' ;
   echo '  ./open-ssl-pk-enc.sh decrypt' ;
   echo '  ./open-ssl-pk-enc.sh decrypt-to-env' ;
