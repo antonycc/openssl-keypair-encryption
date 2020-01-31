@@ -6,17 +6,20 @@
 #   Invoke command:
 #     ./open-ssl-pk-enc.sh <command>
 # See:
-#   https://unix.stackexchange.com/questions/296697/how-to-encrypt-a-file-with-private-key
-#   https://cheapsslsecurity.com/blog/various-types-ssl-commands-keytool/
 #   https://linux.die.net/man/1/rsautl
+#   https://www.openssl.org/docs/man1.0.2/man1/openssl-enc.html
 #   https://www.czeskis.com/random/openssl-encrypt-file.html
 
 # Constants
 PEM_DIR=~/.ssh
+CIPHERNAME='aes-256-cbc'
 RECIPIENTS_DIR='recipients'
 SECRETS_FILE='secret-files.txt'
 ARCHIVE_FILE='archive'
+#TAR_DEBUG=' '
+#ENC_DEBUG=' '
 TAR_DEBUG='--verbose'
+ENC_DEBUG='-v'
 
 # Parameters
 COMMAND="${1:list}"
@@ -69,7 +72,7 @@ then
   rm -f "${ARCHIVE_FILE?}.tar" \
   && while IFS='' read -r SECRET_FILE ;
     do
-      tar -r "${TAR_DEBUG}" \
+      tar -r ${TAR_DEBUG} \
         --file "${ARCHIVE_FILE?}.tar" \
         "${SECRET_FILE?}" ;
     done < "${SECRETS_FILE?}" \
@@ -79,7 +82,7 @@ then
     -name "*.public" \
     | while read -r PUBLIC_KEY_FILE ;
     do
-      echo "Encrypting \"${ARCHIVE_FILE?}\" with public key \"${PUBLIC_KEY_FILE?}\"" ;
+      echo "Encrypting \"${ARCHIVE_FILE?}.tar\" with public key \"${PUBLIC_KEY_FILE?}\"" ;
       RECIPIENT=$(basename "${PUBLIC_KEY_FILE?}" | sed -e 's/.public$//') \
       && rm -f "${RECIPIENT?}.key.bin" \
       && openssl rand -base64 32 > "${RECIPIENT?}.key.bin" \
@@ -90,18 +93,18 @@ then
         -pubin \
         -in "${RECIPIENT?}.key.bin" \
         -out "${RECIPIENT?}.key.bin.enc" \
-      ; rm -f "${RECIPIENT?}.key.bin" \
-      && tar -r "${TAR_DEBUG}" \
+      && tar -r ${TAR_DEBUG} \
         --file "${ARCHIVE_FILE?}.enc.tar" \
         "${RECIPIENT?}.key.bin.enc" \
+      ; rm -f "${RECIPIENT?}.key.bin.enc" \
       ; rm -f "${RECIPIENT?}.${ARCHIVE_FILE?}.tar.enc" \
-      && openssl enc -aes-256-cbc \
+      && openssl enc -${CIPHERNAME?} ${ENC_DEBUG} \
         -salt \
         -in "${ARCHIVE_FILE?}.tar" \
         -out "${RECIPIENT?}.${ARCHIVE_FILE?}.tar.enc" \
-        -pass "file:./${RECIPIENT?}.key.bin.enc" \
-      ; rm -f "${RECIPIENT?}.key.bin.enc" \
-      && tar -r "${TAR_DEBUG}" \
+        -pass "file:./${RECIPIENT?}.key.bin" \
+      ; rm -f "${RECIPIENT?}.key.bin" \
+      && tar -r ${TAR_DEBUG} \
         --file "${ARCHIVE_FILE?}.enc.tar" \
         "${RECIPIENT?}.${ARCHIVE_FILE?}.tar.enc" \
       && rm "${RECIPIENT?}.${ARCHIVE_FILE?}.tar.enc" ;
@@ -114,7 +117,8 @@ then
   
   # Extract for the recipients for which a keypair exists locally
   rm -f "${ARCHIVE_FILE?}.tar" \
-  && tar -t --file "${ARCHIVE_FILE?}.enc.tar" \
+  && tar -t ${TAR_DEBUG} \
+    --file "${ARCHIVE_FILE?}.enc.tar" \
     | grep 'key.bin.enc$' \
     | while read -r RECIPIENT_KEY_ENCRYPTED ;
     do
@@ -124,9 +128,9 @@ then
       && if [[ -e "${PUBLIC_PRIVATE_PAIR_PEM_FILE?}" ]] ;
       then
         echo "Decrypting \"${RECIPIENT_ARCHIVE_FILE?}\" with public key \"${PUBLIC_PRIVATE_PAIR_PEM_FILE?}\"" ;
-        tar -x "${TAR_DEBUG}" \
+        tar -x ${TAR_DEBUG} \
           --file "${ARCHIVE_FILE?}.enc.tar" "${RECIPIENT?}.key.bin.enc" \
-        && tar -x "${TAR_DEBUG}" \
+        && tar -x ${TAR_DEBUG} \
           --file "${ARCHIVE_FILE?}.enc.tar" "${RECIPIENT_ARCHIVE_FILE?}" \
         && openssl rsautl \
           -decrypt \
@@ -134,14 +138,14 @@ then
           -in "${RECIPIENT?}.key.bin.enc" \
           -out "${RECIPIENT?}.key.bin" \
         && rm -f "${RECIPIENT?}.key.bin.enc" \
-        && openssl enc -aes-256-cbc \
+        && openssl enc -${CIPHERNAME?} ${ENC_DEBUG} \
           -d \
           -in "${RECIPIENT_ARCHIVE_FILE?}" \
           -out "${ARCHIVE_FILE?}.tar" \
           -pass "file:./${RECIPIENT?}.key.bin" \
         ; rm -f "${RECIPIENT?}.key.bin" \
         ; rm -f "${RECIPIENT_ARCHIVE_FILE?}" \
-        && tar -x "${TAR_DEBUG}" \
+        && tar -x ${TAR_DEBUG} \
           --file "${ARCHIVE_FILE?}.tar" \
         ; rm -f "${ARCHIVE_FILE?}.tar" ;
       else
