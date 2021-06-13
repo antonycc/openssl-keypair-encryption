@@ -13,9 +13,9 @@
 # TODO:
 #   Decrypt files and consult in the current shell
 #   Is there a standard way to locate the local .PEMs?
-#   Allow parameter override of key_dir
+#   Allow parameter override of KEY_DIR
 #   Standard approach for parameter handling
-#   Document manual equivalent in README
+#   Document manual equivelant in README
 #   Docker execution
 #   Capture Macos (Brew) and Debian package manager dependencies
 #   Test package dependencies
@@ -24,102 +24,102 @@
 #   Adopt Google Coding standards: https://google.github.io/styleguide/shell.xml
 
 # Constants
-readonly key_dir=~/.ssh
-readonly cipher_name='aes-256-cbc'
-readonly rsa_key_size='2048'
-readonly rsa_key_algo='des3'
-readonly recipients_dir='recipients'
-readonly secrets_file='secret-files.txt'
-readonly archive_file='archive'
-#readonly tar_debug=' '
-#readonly enc_debug=' '
-readonly tar_debug='--verbose'
-readonly enc_debug='-v'
+readonly KEY_DIR=~/.ssh
+readonly CIPHERNAME='aes-256-cbc'
+readonly RSA_KEY_SIZE='2048'
+readonly RSA_KEY_ALGO='des3'
+readonly RECIPIENTS_DIR='recipients'
+readonly SECRETS_FILE='secret-files.txt'
+readonly ARCHIVE_FILE='archive'
+#readonly TAR_DEBUG=' '
+#readonly ENC_DEBUG=' '
+readonly TAR_DEBUG='--verbose'
+readonly ENC_DEBUG='-v'
 
 # Parameters
-readonly command="${1:list}"
-readonly public_private_pair="${2}"
+readonly COMMAND="${1:list}"
+readonly PUBLIC_PRIVATE_PAIR="${2}"
 
-if [[ "${command?}" == 'generate-keypair' ]] ;
+if [[ "${COMMAND?}" == 'generate-keypair' ]] ;
 then
 
-  openssl genrsa -${rsa_key_algo?} \
-    -out "${public_private_pair?}.pem" \
-    ${rsa_key_size?} \
-  && mv "${public_private_pair?}.pem" "${key_dir?}/." \
-  && chmod 600 "${key_dir?}/${public_private_pair?}.pem" \
-  ; ls -l "${key_dir?}/${public_private_pair?}.pem"
+  openssl genrsa -${RSA_KEY_ALGO?} \
+    -out "${PUBLIC_PRIVATE_PAIR?}.pem" \
+    ${RSA_KEY_SIZE?} \
+  && mv "${PUBLIC_PRIVATE_PAIR?}.pem" "${KEY_DIR?}/." \
+  && chmod 600 "${KEY_DIR?}/${PUBLIC_PRIVATE_PAIR?}.pem" \
+  ; ls -l "${KEY_DIR?}/${PUBLIC_PRIVATE_PAIR?}.pem"
 
-elif [[ "${command?}" == 'list-available-keypairs' ]] ;
+elif [[ "${COMMAND?}" == 'list-available-keypairs' ]] ;
 then
 
   # List PEM files in the local key store
-  find "${key_dir?}" \
+  find "${KEY_DIR?}" \
     -name "*.pem" \
     | while read -r public_private_pair_pem_file ;
     do
-      echo -n "[${key_dir?}/] " ;
+      echo -n "[${KEY_DIR?}/] " ;
       public_private_pair="${public_private_pair_pem_file//.pem/}" ;
-      public_key_file="${recipients_dir?}/$(basename "${public_private_pair?}".public)" ;
+      public_key_file="${RECIPIENTS_DIR?}/$(basename "${public_private_pair?}".public)" ;
       if [[ -e "${public_key_file}" ]] ;
       then
-        echo "$public_private_pair_pem_file?} (.pem format, installed to ${recipients_dir?})" ;
+        echo "$public_private_pair_pem_file?} (.pem format, installed to ${RECIPIENTS_DIR?})" ;
       else
         echo "${public_private_pair_pem_file?} (.pem format)" ;
       fi ;
     done ;
 
   # List RSA files in the local key store
-  find "${key_dir?}" \
+  find "${KEY_DIR?}" \
     -name "*.pub" \
     | while read -r public_private_pair_pem_file ;
     do
-      echo -n "[${key_dir?}/] " ;
+      echo -n "[${KEY_DIR?}/] " ;
       public_private_pair="${public_private_pair_pem_file//.pub/}" ;
-      public_key_file="${recipients_dir?}/$(basename "${public_private_pair?}".public)" ;
+      public_key_file="${RECIPIENTS_DIR?}/$(basename "${public_private_pair?}".public)" ;
       if [[ -e "${public_key_file}" ]] ;
       then
-        echo "${public_private_pair?} (RSA format, installed to ${recipients_dir?})" ;
+        echo "${public_private_pair?} (RSA format, installed to ${RECIPIENTS_DIR?})" ;
       else
         echo "${public_private_pair?} (RSA format)" ;
       fi ;
     done ;
 
-elif [[ "${command?}" == 'list-recipients' ]] ;
+elif [[ "${COMMAND?}" == 'list-recipients' ]] ;
 then
 
   # List public key files in the local key store
-  find "${recipients_dir?}" \
+  find "${RECIPIENTS_DIR?}" \
     -name "*.public" \
     | while read -r public_key_file ;
     do
-      echo -n "[${recipients_dir?}/] " ;
+      echo -n "[${RECIPIENTS_DIR?}/] " ;
       recipient=$(basename "${public_key_file?}" | sed -e 's/.public$//') ;
-      public_private_pair_pem_file="${key_dir?}/${recipient?}.pem" ;
-      public_private_pair_rsa_file="${key_dir?}/${recipient?}" ;
+      public_private_pair_pem_file="${KEY_DIR?}/${recipient?}.pem" ;
+      public_private_pair_rsa_file="${KEY_DIR?}/${recipient?}" ;
       if [[ -e "${public_private_pair_pem_file}" ]] ;
       then
-        echo "${recipient?} (PEM is available locally in ${key_dir?})" ;
+        echo "${recipient?} (PEM is available locally in ${KEY_DIR?})" ;
       elif [[ -e "${public_private_pair_rsa_file}" ]] ;
       then
-        echo "${recipient?} (RSA is available locally in ${key_dir?})" ;
+        echo "${recipient?} (RSA is available locally in ${KEY_DIR?})" ;
       else
         echo "${recipient?}" ;
       fi ;
     done ;
 
-elif [[ "${command?}" == 'add-recipient' ]] ;
+elif [[ "${COMMAND?}" == 'add-recipient' ]] ;
 then
 
   # Resolve file names
-  recipient=$(basename "${public_private_pair?}" | sed -e 's/.pem$//') ;
-  public_private_pair_rsa_file="${key_dir?}/${recipient?}.pem" ;
-  public_private_pair_pem_file="${key_dir?}/${recipient?}.pem" ;
+  recipient=$(basename "${PUBLIC_PRIVATE_PAIR?}" | sed -e 's/.pem$//') ;
+  public_private_pair_rsa_file="${KEY_DIR?}/${recipient?}.pem" ;
+  public_private_pair_pem_file="${KEY_DIR?}/${recipient?}.pem" ;
 
   # Generate a PEM if we need to and add to the local key store
   if [[ ! -e "${public_private_pair_pem_file?}" && -e "${public_private_pair_rsa_file?}" ]] ;
   then
-     echo "Found RSA \"${public_private_pair_rsa_file?}\" generating a PEM and adding to \"${key_dir?}\"" \
+     echo "Found RSA \"${public_private_pair_rsa_file?}\" generating a PEM and adding to \"${KEY_DIR?}\"" \
      && openssl rsa \
        -in "${public_private_pair_rsa_file?}" \
        -outform pem \
@@ -130,113 +130,113 @@ then
   # Extract a public key from the key store and add this to the recipients list
   if [[ -e "${public_private_pair_pem_file?}" ]] ;
   then
-    echo "Found .pem \"${public_private_pair_pem_file?}\" extracting the public key and adding to \"${recipients_dir?}\"" \
-    && mkdir -p "${recipients_dir?}" \
+    echo "Found .pem \"${public_private_pair_pem_file?}\" extracting the public key and adding to \"${RECIPIENTS_DIR?}\"" \
+    && mkdir -p "${RECIPIENTS_DIR?}" \
     && openssl rsa \
       -in "${public_private_pair_pem_file?}" \
       -pubout \
-      > "${recipients_dir?}/${recipient?}.public" \
+      > "${RECIPIENTS_DIR?}/${recipient?}.public" \
     ; "./${0}" list-recipients
 
   fi ;
 
-elif [[ "${command?}" == 'remove-recipient' ]] ;
+elif [[ "${COMMAND?}" == 'remove-recipient' ]] ;
 then
 
   # Remove a public key from the recipients list
-  rm "${recipients_dir?}/${public_private_pair?}.public" \
+  rm "${RECIPIENTS_DIR?}/${PUBLIC_PRIVATE_PAIR?}.public" \
   ; "./${0}" list-recipients
 
-elif [[ "${command?}" == 'encrypt' ]] ;
+elif [[ "${COMMAND?}" == 'encrypt' ]] ;
 then
 
   # Build an archive containing all the secret files,
   # then encrypt the secret archive for each registered recipient
-  rm -f "${archive_file?}.tar" \
-  && while IFS='' read -r secret_file ;
+  rm -f "${ARCHIVE_FILE?}.tar" \
+  && while IFS='' read -r SECRET_FILE ;
     do
-      tar -r ${tar_debug} \
-        --file "${archive_file?}.tar" \
-        "${secret_file?}" ;
-    done < "${secrets_file?}" \
-  && ls -l "${archive_file?}.tar" \
-  && rm -f "${archive_file?}.enc.tar" \
-  && find "${recipients_dir?}" \
+      tar -r ${TAR_DEBUG} \
+        --file "${ARCHIVE_FILE?}.tar" \
+        "${SECRET_FILE?}" ;
+    done < "${SECRETS_FILE?}" \
+  && ls -l "${ARCHIVE_FILE?}.tar" \
+  && rm -f "${ARCHIVE_FILE?}.enc.tar" \
+  && find "${RECIPIENTS_DIR?}" \
     -name "*.public" \
-    | while read -r public_key_file ;
+    | while read -r PUBLIC_KEY_FILE ;
     do
-      echo "Encrypting \"${archive_file?}.tar\" with public key \"${public_key_file?}\"" ;
-      recipient=$(basename "${public_key_file?}" | sed -e 's/.public$//') \
+      echo "Encrypting \"${ARCHIVE_FILE?}.tar\" with public key \"${PUBLIC_KEY_FILE?}\"" ;
+      recipient=$(basename "${PUBLIC_KEY_FILE?}" | sed -e 's/.public$//') \
       && rm -f "${recipient?}.key.bin" \
       && openssl rand -base64 32 > "${recipient?}.key.bin" \
       && rm -f "${recipient?}.key.bin.enc" \
       && openssl rsautl \
         -encrypt \
-        -inkey "${public_key_file?}" \
+        -inkey "${PUBLIC_KEY_FILE?}" \
         -pubin \
         -in "${recipient?}.key.bin" \
         -out "${recipient?}.key.bin.enc" \
-      && tar -r ${tar_debug} \
-        --file "${archive_file?}.enc.tar" \
+      && tar -r ${TAR_DEBUG} \
+        --file "${ARCHIVE_FILE?}.enc.tar" \
         "${recipient?}.key.bin.enc" \
       ; rm -f "${recipient?}.key.bin.enc" \
-      ; rm -f "${recipient?}.${archive_file?}.tar.enc" \
-      && openssl enc -${cipher_name?} ${enc_debug} \
+      ; rm -f "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
+      && openssl enc -${CIPHERNAME?} ${ENC_DEBUG} \
         -salt \
-        -in "${archive_file?}.tar" \
-        -out "${recipient?}.${archive_file?}.tar.enc" \
+        -in "${ARCHIVE_FILE?}.tar" \
+        -out "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
         -pass "file:./${recipient?}.key.bin" \
       ; rm -f "${recipient?}.key.bin" \
-      && tar -r ${tar_debug} \
-        --file "${archive_file?}.enc.tar" \
-        "${recipient?}.${archive_file?}.tar.enc" \
-      && rm "${recipient?}.${archive_file?}.tar.enc" ;
+      && tar -r ${TAR_DEBUG} \
+        --file "${ARCHIVE_FILE?}.enc.tar" \
+        "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
+      && rm "${recipient?}.${ARCHIVE_FILE?}.tar.enc" ;
     done \
-  ; rm -f "${archive_file?}.tar" \
-  ; ls -l "${archive_file?}.enc.tar" ;
+  ; rm -f "${ARCHIVE_FILE?}.tar" \
+  ; ls -l "${ARCHIVE_FILE?}.enc.tar" ;
 
-elif [[ "${command?}" == 'decrypt' ]] ;
+elif [[ "${COMMAND?}" == 'decrypt' ]] ;
 then
 
   # Extract for the recipients for which a keypair exists locally
-  rm -f "${archive_file?}.tar" \
+  rm -f "${ARCHIVE_FILE?}.tar" \
   && tar -t \
-    --file "${archive_file?}.enc.tar" \
+    --file "${ARCHIVE_FILE?}.enc.tar" \
     | grep 'key.bin.enc$' \
     | while read -r recipient_key_encrypted ;
     do
       echo "recipient_key_encrypted = \"${recipient_key_encrypted?}\""
       recipient=$(basename "${recipient_key_encrypted?}" | sed -e 's/.key.bin.enc$//') \
-      && public_private_pair_pem_file="${key_dir?}/${recipient?}.pem" \
+      && public_private_pair_pem_file="${KEY_DIR?}/${recipient?}.pem" \
       && if [[ -e "${public_private_pair_pem_file?}" ]] ;
       then
-        echo "Decrypting \"${recipient?}.${archive_file?}.tar.enc\" with public key \"${public_private_pair_pem_file?}\"" ;
-        tar -x ${tar_debug} \
-          --file "${archive_file?}.enc.tar" "${recipient?}.key.bin.enc" \
-        && tar -x ${tar_debug} \
-          --file "${archive_file?}.enc.tar" "${recipient?}.${archive_file?}.tar.enc" \
+        echo "Decrypting \"${recipient?}.${ARCHIVE_FILE?}.tar.enc\" with public key \"${public_private_pair_pem_file?}\"" ;
+        tar -x ${TAR_DEBUG} \
+          --file "${ARCHIVE_FILE?}.enc.tar" "${recipient?}.key.bin.enc" \
+        && tar -x ${TAR_DEBUG} \
+          --file "${ARCHIVE_FILE?}.enc.tar" "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
         && openssl rsautl \
           -decrypt \
           -inkey "${public_private_pair_pem_file?}" \
           -in "${recipient?}.key.bin.enc" \
           -out "${recipient?}.key.bin" \
         && rm -f "${recipient?}.key.bin.enc" \
-        && openssl enc -${cipher_name?} ${enc_debug} \
+        && openssl enc -${CIPHERNAME?} ${ENC_DEBUG} \
           -d \
-          -in "${recipient?}.${archive_file?}.tar.enc" \
-          -out "${archive_file?}.tar" \
+          -in "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
+          -out "${ARCHIVE_FILE?}.tar" \
           -pass "file:./${recipient?}.key.bin" \
         ; rm -f "${recipient?}.key.bin" \
-        ; rm -f "${recipient?}.${archive_file?}.tar.enc" \
-        && tar -x ${tar_debug} \
-          --file "${archive_file?}.tar" \
-        ; rm -f "${archive_file?}.tar" ;
+        ; rm -f "${recipient?}.${ARCHIVE_FILE?}.tar.enc" \
+        && tar -x ${TAR_DEBUG} \
+          --file "${ARCHIVE_FILE?}.tar" \
+        ; rm -f "${ARCHIVE_FILE?}.tar" ;
       else
         echo "Skipping \"${public_private_pair_pem_file?}\" (no local key pair)" ;
       fi ;
     done ;
 
-elif [[ "${command?}" == 'decrypt-to-env' ]] ;
+elif [[ "${COMMAND?}" == 'decrypt-to-env' ]] ;
 then
 
   echo 'TODO: Decrypt files and consult in the current shell' ;
