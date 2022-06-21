@@ -9,6 +9,7 @@ Copy the Oké script to your project working directory:
 
 First we have an empty list of recipients:
 ```bash
+ % mkdir -p recipients
  % ./open-ssl-pk-enc.sh list-recipients
  %
 ```
